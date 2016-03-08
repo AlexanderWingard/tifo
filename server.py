@@ -60,8 +60,7 @@ def master(queue):
         yield sleep(2)
         res = yield capture(len(clients))
         client.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'white'}))
-        for c in clients:
-            c.sendMessage(json.dumps(res))
+        client.sendMessage(json.dumps(res))
 
 class WSProtocol(WebSocketServerProtocol):
 
