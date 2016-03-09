@@ -16,7 +16,7 @@ body {
 </style>
 </head>
 <body>
-<img id="img" src="test0.jpg">
+<img id="img" src="test0.jpg" style="display:none">
 </body>
 <script>
 var ws;
@@ -26,8 +26,11 @@ function ws_connect() {
         ws.onmessage = function(event) {
             data = JSON.parse(event.data)
             if(data.msg == 'bg') {
+                document.getElementById("img").style.display = "none";
                 document.body.style.backgroundColor = data.color;
-            } else if(data.msg = 'rect') {
+            } else if(data.msg == 'rect') {
+                
+                document.getElementById("img").style.display = "block";
                 deltaX = data.rect[2][0] - data.rect[1][0];
                 deltaY = data.rect[2][1] - data.rect[1][1];
 

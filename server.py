@@ -15,31 +15,41 @@ from autobahn.twisted.resource import WebSocketResource
 clients = []
 queue = DeferredQueue()
 cap = cv2.VideoCapture(0)
+lower = np.array([0, 0,200], dtype = "uint8")
+upper = np.array([180, 180, 255], dtype = "uint8")
 
-def capture(num):
-    lower = np.array([0, 0,200], dtype = "uint8")
-    upper = np.array([180, 180, 255], dtype = "uint8")
-    ret, im = cap.read()
+@inlineCallbacks
+def capture():
+    for n in xrange(0,10):
+        yield sleep(1)
+        ret, im = cap.read()
+        thresh = cv2.inRange(im, lower, upper)
+        contours, h = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
+        contours = sorted(contours, key=cv2.contourArea,reverse=True)[:1]
 
-    thresh = cv2.inRange(im, lower, upper)
-    contours, h = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
-    contours = sorted(contours, key=cv2.contourArea,reverse=True)[:1]
-
-    if len(contours) > 0:
+        if len(contours) ==  0:
+            continue;
         rect = cv2.minAreaRect(contours[0])
+        if (rect[1][0] * rect[1][1]) < 20000:
+            continue;
         box = cv2.cv.BoxPoints(rect)
-        return {'msg': 'rect', 'rect': box, 'shape': im.shape}
-    else:
-        return {'msg': 'fail'}
+        cv2.drawContours(im,[np.int0(box)],0,(0,255,0),2)
+        cv2.imshow('image',im)
+        cv2.waitKey(1)
+        returnValue({'msg': 'rect', 'rect': box, 'shape': im.shape})
+
+    returnValue({'msg': 'fail'})
 
 @inlineCallbacks
 def master(queue):
     while True:
         client = yield queue.get()
-        client.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'red'}))
-        res = yield capture(len(clients))
-        client.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'white'}))
-        client.sendMessage(json.dumps(res))
+        for c in clients:
+            c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'red'}))
+            res = yield capture()
+            c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'white'}))
+
+            c.sendMessage(json.dumps(res))
 
 class WSProtocol(WebSocketServerProtocol):
 
