@@ -15,15 +15,16 @@ from autobahn.twisted.resource import WebSocketResource
 clients = []
 queue = DeferredQueue()
 cap = cv2.VideoCapture(0)
-lower = np.array([0, 0,200], dtype = "uint8")
-upper = np.array([180, 180, 255], dtype = "uint8")
 
 @inlineCallbacks
 def capture():
     for n in xrange(0,10):
         yield sleep(1)
         ret, im = cap.read()
-        thresh = cv2.inRange(im, lower, upper)
+        ret,thresh = cv2.threshold(cv2.cvtColor(im,cv2.COLOR_BGR2GRAY),127,255,0)
+        cv2.imshow('image',thresh)
+        cv2.waitKey(1)
+
         contours, h = cv2.findContours(thresh,cv2.RETR_TREE,cv2.CHAIN_APPROX_SIMPLE)
         contours = sorted(contours, key=cv2.contourArea,reverse=True)[:1]
 
@@ -36,6 +37,7 @@ def capture():
         cv2.drawContours(im,[np.int0(box)],0,(0,255,0),2)
         cv2.imshow('image',im)
         cv2.waitKey(1)
+
         returnValue({'msg': 'rect', 'rect': box, 'shape': im.shape})
 
     returnValue({'msg': 'fail'})
@@ -43,13 +45,18 @@ def capture():
 @inlineCallbacks
 def master(queue):
     while True:
+        r = {}
         client = yield queue.get()
         for c in clients:
-            c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'red'}))
-            res = yield capture()
+            c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'black'}))
+        for c in clients:
             c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'white'}))
+            r[c] = yield capture()
+            c.sendMessage(json.dumps({'msg' : 'bg', 'color' : 'black'}))
+            yield sleep(1)
 
-            c.sendMessage(json.dumps(res))
+        for k in r:
+            k.sendMessage(json.dumps(r[k]))
 
 class WSProtocol(WebSocketServerProtocol):
 

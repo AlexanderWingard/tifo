@@ -3,7 +3,7 @@
 <head>
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="viewport" content="width=device-width, height=device-height, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <title>Light Up L3</title>
 <script src="//d3js.org/d3.v3.min.js" charset="utf-8"></script>
 <style>
@@ -16,7 +16,9 @@ body {
 </style>
 </head>
 <body>
-<img id="img" src="test0.jpg" style="display:none">
+<div id="cont" style="overflow:hidden; width:100%; height:100%; border:1px solid transparent;">
+<img id="img" src="test0.jpg" style="display:none;">
+</div>
 </body>
 <script>
 var ws;
@@ -24,21 +26,33 @@ function ws_connect() {
     if(ws == null) {
         ws = new WebSocket("ws://" + location.host + "/ws");
         ws.onmessage = function(event) {
-            data = JSON.parse(event.data)
+            var data = JSON.parse(event.data);
+            var img = document.getElementById("img");
             if(data.msg == 'bg') {
-                document.getElementById("img").style.display = "none";
+                img.style.display = "none";
                 document.body.style.backgroundColor = data.color;
             } else if(data.msg == 'rect') {
-                
-                document.getElementById("img").style.display = "block";
-                deltaX = data.rect[2][0] - data.rect[1][0];
-                deltaY = data.rect[2][1] - data.rect[1][1];
+                img.style.display = "block";
 
-                scale = window.innerWidth / deltaX;
+                sort_cordinates(data);
+                var topLeftX = data.rect[0][0];
+                var topRightX = data.rect[1][0];
+                var topLeftY = data.rect[0][1];
+                var topRightY = data.rect[1][1];
+                var dX = topRightX - topLeftX;
+                var dY = topRightY - topLeftY;
+                var length = Math.sqrt((dX * dX) + (dY * dY));
 
-                document.getElementById("img").style.transformOrigin=data.rect[1][0] + "px " +  data.rect[1][1] + "px";
-                document.getElementById("img").style.transform = "translate(" + (-data.rect[1][0]) + "px, " + (-data.rect[1][1]) + "px) rotate(" + - Math.atan(deltaY / deltaX) + "rad) scale(" + scale + ")";
+                var transformOrigin = topLeftX + "px " +  topLeftY + "px";
+                var translate = "translate(" + (-topLeftX) + "px, " + (-topLeftY) + "px)";
+                var rotate = "rotate(" + (-Math.atan(dY / dX)) + "rad)";
+                var scale = "scale(" + window.innerWidth / length + ")";
+                var transform = translate + " " + rotate + " " + scale;
 
+                img.style["transformOrigin"] = transformOrigin;
+                img.style["-webkit-transformOrigin"] = transformOrigin;
+                img.style["transform"] = transform;
+                img.style["-webkit-transform"] = transform;
             }
         }
         ws.onclose = function(event) {
@@ -50,7 +64,23 @@ function ws_connect() {
         }
     }
 }
-ws_connect();
+
+function sort_cordinates(data) {
+    var distances = data.rect.map(function(d) {
+        return Math.sqrt((d[0] * d[0]) + (d[1] * d[1]))
+    });
+    var topLeftDistance = Math.min.apply(null, distances)
+    while(true) {
+        var x = data.rect[0][0];
+        var y = data.rect[0][1];
+        if (Math.sqrt((x * x) + (y *y)) == topLeftDistance) {
+            break;
+        }
+        var first = data.rect.shift();
+        data.rect.push(first);
+    }
+}
+
 function ws_send(msg) {
     var json = JSON.stringify(msg);
     if(ws == null) {
@@ -62,5 +92,7 @@ function ws_send(msg) {
         ws.send(json);
     }
 }
+
+ws_connect();
 </script>
 </html>
